@@ -1926,7 +1926,7 @@ document.addEventListener("change",e=>{
     render()};
   rdr.readAsText(f);
 });
-if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{})})}
+if("serviceWorker" in navigator){let reloaded=false;const hadCtl=!!navigator.serviceWorker.controller;navigator.serviceWorker.addEventListener("controllerchange",()=>{if(reloaded||!hadCtl||st.view==="jugar")return;reloaded=true;location.reload()});window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(r=>{r.update().catch(()=>{});document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")r.update().catch(()=>{})})}).catch(()=>{})})}
 
 </script>
 
