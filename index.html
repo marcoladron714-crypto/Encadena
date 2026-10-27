@@ -222,6 +222,41 @@ img.fig3.xs{width:46px;height:29px;border-radius:5px}
 img.fig3.sm{width:64px;height:40px;border-radius:8px}
 .figwrap.lg canvas.fig3{width:100%;max-width:340px;aspect-ratio:8/5;border-radius:12px}
 .figwrap.xl canvas.fig3{width:100%;max-width:440px;aspect-ratio:8/5;border-radius:14px}
+.nudge{background:var(--accent);color:var(--accent-ink);border-radius:12px;padding:12px 14px;font-weight:600}
+.week.done{border-color:var(--ok)}
+.streak{display:grid;justify-items:end;line-height:1}
+.streak b{font-family:var(--display);font-size:2.4rem;color:var(--accent);font-variant-numeric:tabular-nums}
+.streak span{font-size:.75rem;color:var(--muted);text-align:right}
+.wdots{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.wdots i{flex:1;max-width:64px;min-width:18px;height:12px;border-radius:6px;background:var(--soft);border:1px solid var(--line)}
+.wdots i.on{background:var(--accent);border-color:var(--accent)}
+.week.done .wdots i.on{background:var(--ok);border-color:var(--ok)}
+.wdots .extra{font-family:var(--display);font-weight:700;color:var(--ok)}
+.wstrip{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:6px}
+.wk{border:1px solid var(--line);border-radius:8px;padding:6px 4px;display:grid;justify-items:center;background:var(--soft)}
+.wk b{font-family:var(--display);font-size:1.3rem;line-height:1;font-variant-numeric:tabular-nums}
+.wk span{font-size:.62rem;color:var(--muted);white-space:nowrap}
+.wk.ok{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.wk.ok span{color:var(--accent-ink);opacity:.85}
+.wk.part{background:var(--accent-soft)}
+.sq.part{background:var(--accent-soft);border:1px solid var(--line)}
+@media (orientation:landscape) and (max-height:640px){
+  body.playing #app{max-width:none;padding-top:10px}
+  body.playing .pcard{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);column-gap:22px;row-gap:8px;align-items:start}
+  body.playing .pcard > *{grid-column:1}
+  body.playing .pcard > .figwrap.xl{grid-column:2;grid-row:1 / span 8;position:sticky;top:10px;align-self:start}
+  body.playing .figwrap.xl canvas.fig3,body.playing .figwrap.xl .fig2{max-width:none;width:100%}
+  body.playing .pcard h1{font-size:2rem}
+  body.playing.timing .timerbar{top:0;bottom:0;display:grid;grid-template-columns:minmax(0,1fr) 40vw;grid-template-rows:1fr auto;align-items:center;padding-top:max(12px,env(safe-area-inset-top,0px));z-index:40}
+  body.playing.timing .timerbar > div:first-child{grid-column:1;grid-row:1;display:grid;gap:4px}
+  body.playing.timing .timerbar span{font-size:clamp(1rem,4.5vh,1.6rem);opacity:.9;text-transform:uppercase;letter-spacing:.06em;font-family:var(--display);font-weight:700}
+  body.playing.timing .timerbar b{font-size:min(46vh,24vw);line-height:.85;letter-spacing:-.02em}
+  body.playing.timing .timerbar .btnrow{grid-column:1;grid-row:2}
+  body.playing.timing .timerbar .btn{font-size:1.1rem;min-height:48px;padding:10px 20px}
+  body.playing.timing .pcard > .figwrap.xl{position:fixed;right:max(14px,env(safe-area-inset-right,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));width:38vw;z-index:41;margin:0}
+  body.playing.timing .figwrap.xl figcaption{display:none}
+  body.playing.timing .figwrap.xl canvas.fig3,body.playing.timing .figwrap.xl .fig2{border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+}
 </style>
 <style>
 html,body{margin:0}
@@ -1250,7 +1285,7 @@ function fmtTime(s){s=Math.max(0,Math.ceil(s));return Math.floor(s/60)+":"+pad(s
 
 function figBlock(id,size){const c=capOf(id);return `<figure class="figwrap ${size}">${figSvg(id,size)}${c?`<figcaption>${esc(c)}</figcaption>`:""}</figure>`}
 
-const st={view:"juego",previewN:null,data:{sesiones:[],bici:[],cuerpo:[]},synced:false,local:false,swaps:{},open:null,swapKey:null,
+const st={cfg:null,cfgMsg:"",view:"juego",previewN:null,data:{sesiones:[],bici:[],cuerpo:[]},synced:false,local:false,swaps:{},open:null,swapKey:null,
   bikeForm:false,bodyForm:false,catQ:"",catC:"all",catOpen:null,play:null,confirmQuit:false,done:null,msg:""};
 let db=null;
 
@@ -1304,6 +1339,68 @@ async function remove(col,id){
   try{localStorage.setItem("encadena-datos",JSON.stringify(st.data))}catch(e){}
 }
 
+/* ---------- ajustes y meta semanal ---------- */
+const CFG_DEF={meta:3,hora:"20:00"};
+function loadCfg(){try{return Object.assign({},CFG_DEF,JSON.parse(localStorage.getItem("encadena-ajustes")||"{}"))}catch(e){return Object.assign({},CFG_DEF)}}
+st.cfg=loadCfg();
+function saveCfg(){try{localStorage.setItem("encadena-ajustes",JSON.stringify(st.cfg))}catch(e){}}
+function ymd(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
+function weekStart(f){const d=new Date(f+"T12:00:00");d.setDate(d.getDate()-((d.getDay()+6)%7));return ymd(d)}
+function addDays(f,n){const d=new Date(f+"T12:00:00");d.setDate(d.getDate()+n);return ymd(d)}
+function weekInfo(){
+  const meta=st.cfg.meta,cnt={};
+  st.data.sesiones.forEach(s=>{const w=weekStart(s.fecha);cnt[w]=(cnt[w]||0)+1});
+  const cur=weekStart(today());const weeks=[];
+  const first=st.data.sesiones.length?weekStart(st.data.sesiones.map(s=>s.fecha).sort()[0]):cur;
+  for(let w=first;w<=cur;w=addDays(w,7))weeks.push({w,n:cnt[w]||0,ok:(cnt[w]||0)>=meta});
+  let streak=0;for(let i=weeks.length-2;i>=0;i--){if(weeks[i].ok)streak++;else break}
+  const now=weeks[weeks.length-1];if(now.ok)streak++;
+  let best=0,run=0;weeks.forEach(x=>{run=x.ok?run+1:0;best=Math.max(best,run)});
+  const left=7-((new Date(today()+"T12:00:00").getDay()+6)%7);
+  return {meta,now:now.n,ok:now.ok,streak,best,left,weeks};
+}
+function afterHour(){const [h,m]=st.cfg.hora.split(":").map(Number);const d=new Date();return d.getHours()*60+d.getMinutes()>=h*60+m}
+function weekCard(){
+  const wi=weekInfo();const dots=Array.from({length:wi.meta},(_,i)=>`<i class="${i<wi.now?"on":""}"></i>`).join("")+(wi.now>wi.meta?`<span class="extra">+${wi.now-wi.meta}</span>`:"");
+  const msg=wi.ok?"Semana cumplida. Lo que hagas de más suma a tus gráficas.":`Te faltan ${wi.meta-wi.now} ${wi.meta-wi.now===1?"nivel":"niveles"} · quedan ${wi.left} ${wi.left===1?"día":"días"} de esta semana`;
+  return `<section class="card week ${wi.ok?"done":""}">
+    <div class="bike-head"><div><p class="eyebrow">Meta semanal</p><h3>${wi.now} de ${wi.meta} niveles</h3></div>
+    <div class="streak"><b>${wi.streak}</b><span>${wi.streak===1?"semana":"semanas"} seguidas</span></div></div>
+    <div class="wdots" role="img" aria-label="${wi.now} de ${wi.meta} niveles esta semana">${dots}</div>
+    <p class="muted small">${msg}${wi.best>wi.streak?` Tu mejor racha: ${wi.best} semanas.`:""}</p>
+  </section>`;
+}
+function weeksStrip(){
+  const wi=weekInfo();const last=wi.weeks.slice(-12);
+  return `<div class="wstrip">${last.map(x=>`<div class="wk ${x.ok?"ok":x.n?"part":""}" title="Semana del ${fmtDate(x.w)}: ${x.n} niveles"><b>${x.n}</b><span>${fmtDate(x.w)}</span></div>`).join("")}</div>
+  <p class="legend"><span><i class="sq lv"></i>Meta cumplida</span><span><i class="sq part"></i>Incompleta</span></p>`;
+}
+function icsText(){
+  const [h,m]=st.cfg.hora.split(":");const d=addDays(today(),afterHour()?1:0).replace(/-/g,"");
+  const url=location.href.split("#")[0];
+  return ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Encadena//ES","CALSCALE:GREGORIAN","BEGIN:VEVENT","UID:recordatorio-diario@encadena","DTSTAMP:"+new Date().toISOString().replace(/[-:]/g,"").split(".")[0]+"Z",
+   "DTSTART:"+d+"T"+h+m+"00","DURATION:PT45M","RRULE:FREQ=DAILY","SUMMARY:Encadena: tu siguiente nivel","DESCRIPTION:Abre Encadena y encadena el nivel de hoy. "+url,"URL:"+url,
+   "BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:Hora de entrenar","TRIGGER:PT0M","END:VALARM","END:VEVENT","END:VCALENDAR"].join("\r\n");
+}
+async function addToCalendar(){
+  const blob=new Blob([icsText()],{type:"text/calendar"});const name="encadena-recordatorio.ics";
+  try{const file=new File([blob],name,{type:"text/calendar"});if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:"Recordatorio de Encadena"});st.cfgMsg="Elige Calendario para guardarlo.";render();return}}catch(e){if(e&&e.name==="AbortError")return}
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);
+  st.cfgMsg="Abre el archivo descargado para agregarlo a tu calendario.";render();
+}
+function settingsCard(){
+  const canIcs=!(window.claude&&window.claude.use);
+  return `<section class="card"><h3>Ajustes</h3>
+  <div class="form">
+    <label>Meta de niveles por semana<select id="cfgMeta">${[2,3,4,5,6].map(v=>`<option value="${v}" ${st.cfg.meta===v?"selected":""}>${v} niveles</option>`).join("")}</select></label>
+    <label>Hora para entrenar<input type="time" id="cfgHora" value="${esc(st.cfg.hora)}"></label>
+  </div>
+  <p class="muted small">Si ya pasó tu hora y no has entrenado, la pantalla principal te lo recuerda.${canIcs?" Para que tu celular te avise aunque la app esté cerrada, agrega el recordatorio a tu calendario.":""}</p>
+  ${canIcs?`<div class="btnrow"><button class="btn ghost sm" data-act="ics">Agregar recordatorio al calendario</button></div>`:""}
+  ${st.cfgMsg?`<p class="small muted">${esc(st.cfgMsg)}</p>`:""}
+  </section>`;
+}
+
 /* ---------- niveles con cambios ---------- */
 function levelWithSwaps(n){
   const L=genLevel(n);const sw=st.swaps[n]||{};
@@ -1343,7 +1440,7 @@ function render(){
   startAnims();
 }
 function updateNav(){
-  const nav=$("#nav");nav.hidden=st.view==="jugar";
+  const nav=$("#nav");nav.hidden=st.view==="jugar";if(st.view!=="jugar")document.body.classList.remove("timing");
   nav.querySelectorAll("button").forEach(b=>b.setAttribute("aria-current",(b.dataset.go===st.view||(b.dataset.go==="juego"&&["nivel","hecho"].includes(st.view)))?"page":"false"));
   document.body.classList.toggle("playing",st.view==="jugar");
 }
@@ -1368,6 +1465,7 @@ function viewHome(){
       <div class="eqrow">${equipChips(levelEquip(L))}</div>
       <div class="btnrow">${cont?`<button class="btn" data-act="resume">Continuar donde ibas</button>`:""}<button class="btn ${cont?"ghost":""}" data-act="preview" data-n="${n}">Ver nivel y comenzar</button></div></section>`;
   }
+  const nudge=n<=100&&!trainedToday()&&afterHour()?`<p class="nudge">Ya son más de las ${esc(st.cfg.hora)}. El nivel ${n} te espera · unos ${levelMinutes(levelWithSwaps(n))} min.</p>`:"";
   const bi=bikeInfo();
   const bikeCard=`<section class="card bike">
     <div class="bike-head"><div><p class="eyebrow bk">Misión extra · no avanza nivel</p><h3>Sesión de bici</h3></div>${bi.rec?`<span class="pill rec">Recomendada hoy</span>`:""}</div>
@@ -1384,7 +1482,9 @@ function viewHome(){
     ${backupDue()?`<p class="warn">Hace tiempo que no respaldas tu progreso. <button class="link" data-go="progreso">Ir a respaldo</button></p>`:""}
     ${!st.synced?`<p class="muted small">Cargando tu progreso…</p>`:""}${st.msg?`<p class="warn">${esc(st.msg)}</p>`:""}
   </header>
+  ${nudge}
   ${todayCard}
+  ${weekCard()}
   ${bikeCard}
   <section class="map"><h3 class="sec-title">Mapa</h3>${viewMap(n)}</section>`;
 }
@@ -1552,6 +1652,7 @@ function loop(){
 }
 function paintTimer(){
   const bar=$("#timerbar");if(!bar)return;
+  document.body.classList.toggle("timing",!!T&&st.view==="jugar");
   if(!T){bar.hidden=true;return}
   bar.hidden=false;const ph=T.phases[T.i];
   bar.classList.toggle("work",!!ph.work);
@@ -1678,10 +1779,12 @@ function viewProgress(){
   ${tiles}
   <section class="card"><h3>Avance en el mapa</h3><p class="muted small">Nivel alcanzado contra días desde que empezaste.</p>${avance}</section>
   <section class="card"><h3>Días entrenados</h3>${heatmap()}</section>
+  <section class="card"><h3>Semanas</h3><p class="muted small">Niveles por semana. Meta: ${st.cfg.meta}.</p>${weeksStrip()}</section>
   <section class="card"><h3>Récords de los jefes</h3>${recHtml}</section>
   <section class="card"><div class="bike-head"><h3>Peso y medidas</h3>${st.bodyForm?"":`<button class="btn ghost sm" data-act="bodyform">Registrar</button>`}</div>
     ${st.bodyForm?bodyForm():""}${pesoHtml}
     ${medRows?`<table class="tbl"><tr><th>Medida</th><th>Primera</th><th>Última</th><th>Cambio</th></tr>${medRows}</table>`:""}</section>
+  ${settingsCard()}
   ${backupCard()}
   <section class="card"><h3>Historial</h3>${hist.length?`<ul class="hist">${hist.map(h=>`<li><span>${fmtDate(h.f)}</span><b>${esc(h.t)}</b><span class="muted">${h.m||0} min</span>${h.bid?`<button class="link sm" data-act="delbike" data-id="${esc(h.bid)}" aria-label="Borrar sesión de bici">Borrar</button>`:""}</li>`).join("")}</ul>`:`<p class="empty">Aún no hay sesiones.</p>`}</section>`;
 }
@@ -1746,10 +1849,13 @@ document.addEventListener("click",async e=>{
     case "bodycancel":st.bodyForm=false;render();break;
     case "delbike":await remove("bici",b.dataset.id);render();break;
     case "catc":st.catC=b.dataset.c;render();break;
+    case "ics":addToCalendar();break;
     case "catopen":st.catOpen=st.catOpen===b.dataset.id?null:b.dataset.id;render();break;
   }
 });
 document.addEventListener("change",e=>{
+  if(e.target.id==="cfgMeta"){st.cfg.meta=+e.target.value;saveCfg();render();return}
+  if(e.target.id==="cfgHora"){if(e.target.value){st.cfg.hora=e.target.value;saveCfg();st.cfgMsg=(window.claude&&window.claude.use)?"":"Si ya agregaste el recordatorio al calendario, agrégalo de nuevo para cambiar la hora y borra el anterior.";render()}return}
   const t=e.target;if(!t.dataset||!t.dataset.k||!st.play)return;
   const r=st.play.log[t.dataset.k][+t.dataset.i];r[t.dataset.f]=t.value;saveInProgress();
 });
@@ -1791,7 +1897,7 @@ function backupCard(){
   return `<section class="card"><h3>Respaldo</h3>${body}</section>`;
 }
 async function exportBackup(){
-  const payload={app:"encadena",version:1,fecha:today(),data:st.data};
+  const payload={app:"encadena",version:1,fecha:today(),data:st.data,ajustes:st.cfg};
   const name="encadena-respaldo-"+today()+".json";
   const blob=new Blob([JSON.stringify(payload)],{type:"application/json"});
   let ok=false;
@@ -1807,7 +1913,7 @@ document.addEventListener("click",e=>{
   if(a==="export"){exportBackup()}
   else if(a==="import"){const i=document.getElementById("impF");if(i)i.click()}
   else if(a==="importno"){st.pendingImport=null;render()}
-  else if(a==="importyes"){const p=st.pendingImport;st.data={sesiones:p.data.sesiones,bici:p.data.bici,cuerpo:p.data.cuerpo};try{localStorage.setItem("encadena-datos",JSON.stringify(st.data))}catch(err){}
+  else if(a==="importyes"){const p=st.pendingImport;st.data={sesiones:p.data.sesiones,bici:p.data.bici,cuerpo:p.data.cuerpo};if(p.ajustes){st.cfg=Object.assign({},CFG_DEF,p.ajustes);saveCfg()}try{localStorage.setItem("encadena-datos",JSON.stringify(st.data))}catch(err){}
     st.pendingImport=null;st.backupMsg="Respaldo cargado.";st.backupErr=false;render()}
 });
 document.addEventListener("change",e=>{
@@ -1815,7 +1921,7 @@ document.addEventListener("change",e=>{
   const f=e.target.files[0];const rdr=new FileReader();
   rdr.onload=()=>{try{const j=JSON.parse(rdr.result);const d=j&&j.data;
       if(j.app!=="encadena"||!d||!Array.isArray(d.sesiones)||!Array.isArray(d.bici)||!Array.isArray(d.cuerpo))throw new Error("formato");
-      st.pendingImport={fecha:j.fecha||today(),data:d};st.backupMsg="";}
+      st.pendingImport={fecha:j.fecha||today(),data:d,ajustes:j.ajustes};st.backupMsg="";}
     catch(err){st.pendingImport=null;st.backupMsg="Ese archivo no es un respaldo de Encadena. Elige el archivo .json que guardaste desde aquí.";st.backupErr=true}
     render()};
   rdr.readAsText(f);
